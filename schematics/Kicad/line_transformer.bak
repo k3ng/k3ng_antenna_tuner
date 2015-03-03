@@ -1,0 +1,22 @@
+EESchema-LIBRARY Version 2.3  Date: 1/23/2013 21:02:15
+#encoding utf-8
+#
+# transformer
+#
+DEF transformer T 0 40 N N 1 F N
+F0 "T" -130 10 40 V V C CNN
+F1 "transformer" 45 0 40 V V C CNN
+DRAW
+A -115 0 55 -899 899 0 1 0 N -115 -55 -115 55
+A 0 -150 50 901 -901 0 1 0 N 0 -100 0 -200
+A 0 -50 50 901 -901 0 1 0 N 0 0 0 -100
+A 0 50 50 901 -901 0 1 0 N 0 100 0 0
+A 0 148 52 901 -901 0 1 0 N 0 200 0 95
+X 1 1 -115 155 100 D 70 70 1 1 P
+X 2 2 -115 -155 100 U 70 70 1 1 P
+X 3 3 0 300 100 D 70 70 1 1 P
+X 4 4 0 -300 100 U 70 70 1 1 P
+ENDDRAW
+ENDDEF
+#
+#End Library
