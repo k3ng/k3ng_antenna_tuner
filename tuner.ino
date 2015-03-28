@@ -2,7 +2,7 @@
 
  Arduino Antenna Tuner
 
- Copyright 2013 Anthony Good, K3NG
+ Copyright 2013 and every year after that, Anthony Good, K3NG
  All trademarks referred to in source code and documentation are copyright their respective owners.
 
  ***************************************************************************************************************
@@ -17,10 +17,12 @@
  ***************************************************************************************************************
    
  Are you a radio artisan ?   
+
+ 2015032701 : improved SWR formula from recommendation of Graeme, ZL2APV; DEBUG_MODE_DEFAULT
  
 */
 
-#define CODE_VERSION "2013062601"
+#define CODE_VERSION "2015032701"
 
 #define TWI_FREQ 100000L //100000L   // change this if you would like to speed up the I2C bus - this is the bus freq in hertz
 #include <Wire.h>                    // used for I2C functionality
@@ -46,11 +48,11 @@
 //   - parse macros for native pins that are used and initialize them
 //   - handle high voltage in measure_swr()
 //   - schematic: ASR disable with cap
-//   - hardware: 1:4 balun
 //   - read Yaesu SWR?
 //   - buffer clean out for one band
 //   - overwrite same frequency entries in tune_buffer_add?
 //   - CLI rig switching and current_rig switching
+//   - option to use hardware serial ports on Mega
 
 
 
@@ -187,6 +189,7 @@ Rig *rig[] = {&rig0};  /*Rig *rig[] = {&rig0,&rig1,&rig3};*/
 #define HI_L_L_INCREMENT 200                 // uH * 100
 #define DEBUG_STATUS_DUMP_FREQ_MS 500        // how often to do a periodic status dump
 #define DEBUG_STATUS_DUMP_DELAY 0            // delay this many seconds after doing a status dump (only for debug purposes)
+#define DEBUG_MODE_DEFAULT 0
 
 
 
@@ -222,7 +225,7 @@ unsigned int tuned_freq = 0;
 byte best_match_tuning_mode = 0;
 float best_match_swr = 999;
 byte tried_best_swr = 0;
-byte debug_mode = 1;
+byte debug_mode = DEBUG_MODE_DEFAULT;
 byte manual_tune_invoke = 0;
 byte lock_invoke = 0;
 byte unlock_invoke = 0;
@@ -1736,11 +1739,13 @@ void measure_swr() {
       Serial.println(transmit_sense);     
       #endif //DEBUG_MEASURE_SWR 
       if (forward_voltage > reverse_voltage) {
-        swr = /*abs(  */(float(forward_voltage + reverse_voltage) / float(forward_voltage - reverse_voltage)) /*)*/;
+        if (reverse_voltage == 0) {reverse_voltage = 1;} // added 2013-03-27 - suggested by Graeme zl2apv for extra precision
+        swr = (float(forward_voltage + reverse_voltage) / float(forward_voltage - reverse_voltage)) /*)*/;
       } 
       else {
         swr = 100;
       }
+
 
       //forward_power = correct_power((float(forward_voltage)/50) * forward_voltage);
       //forward_power = (((float(forward_voltage)/50) * forward_voltage)*0.5);
