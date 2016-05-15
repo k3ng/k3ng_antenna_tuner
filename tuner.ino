@@ -45,9 +45,12 @@
   2.0.2016051501   
     Replaced frequency counter library (Thanks Joe, VE3VXO) 
 
+  2.0.2016051502
+    New frequency counter library - forgot to copy over initialization code  
+
 */
 
-#define CODE_VERSION "2.0.2016051501"
+#define CODE_VERSION "2.0.2016051502"
 
 #define TWI_FREQ 100000L //100000L   // change this if you would like to speed up the I2C bus - this is the bus freq in hertz
 #include <Wire.h>                    // used for I2C functionality
@@ -1317,6 +1320,11 @@ void initialize_freq_counter(){
       Serial.println(F("initialize_freq_counter: doing freq reads"));
     #endif  //DEBUG_REAL_DEEP_STUFF
     
+    #if !defined(OPTION_USE_OLD_FREQ_COUNTER_LIBRARY)
+      FreqCount.begin(FREQ_COUNTER_GATE_TIME);
+    #endif
+
+
     for (byte x = 0;x < 3; x++) {  // do a few reads just to blow the dust out
       current_freq();
     }

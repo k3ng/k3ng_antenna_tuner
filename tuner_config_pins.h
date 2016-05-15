@@ -7,6 +7,8 @@
 #define pin_tuned 0              // indicator - goes high when tuned (0 = disable)
 #define pin_untunable 0          // indicator - goes high when untunable (0 = disable)
 #define pin_frequency_counter 5  // input - frequency counter (dummy entry - hard coded in frequency counter library)
+                                 //   Uno: pin 5
+                                 //   Mega: pin 47
 #define pin_tune_lock 6          // input - ground to lock tuning (0 = disable)
 #define pin_forward_v  A0        // input (analog) - SWR sensor forward voltage
 #define pin_reflected_v A1       // input (analog) - SWR sensor reverse voltage

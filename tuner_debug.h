@@ -16,3 +16,4 @@
 // #define DEBUG_DONT_TUNE
 // #define DEBUG_NO_FREQ
 // #define DEBUG_SERIAL
+// #define OPTION_USE_OLD_FREQ_COUNTER_LIBRARY
