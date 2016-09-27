@@ -48,9 +48,14 @@
   2.0.2016051502
     New frequency counter library - forgot to copy over initialization code  
 
+    
+
+  2.0.2016092701
+    update_static_screen_swr() - increased size of workstring (thanks, Jim - G3ZQC)
+
 */
 
-#define CODE_VERSION "2.0.2016051502"
+#define CODE_VERSION "2.0.2016092701"
 
 #define TWI_FREQ 100000L //100000L   // change this if you would like to speed up the I2C bus - this is the bus freq in hertz
 #include <Wire.h>                    // used for I2C functionality
@@ -1265,7 +1270,7 @@ byte adjust(byte component, byte adjustment_type, unsigned int amount){
 void check_relay_status(){
   
   #ifdef DEBUG_REAL_DEEP_STUFF
-  Serial.println(F("check_relay_status: entering"));
+    Serial.println(F("check_relay_status: entering"));
   #endif
   
   if ((relay_status == RELAY_SETTLE) && ((millis() - relay_settle_start_time) >= RELAY_SETTLE_TIME_MS)){
@@ -1277,7 +1282,7 @@ void check_relay_status(){
 void initiate_relay_settle(){
 
   #ifdef DEBUG_REAL_DEEP_STUFF
-  Serial.println(F("initiate_relay_settle: entering"));
+    Serial.println(F("initiate_relay_settle: entering"));
   #endif
   
   relay_status = RELAY_SETTLE;
@@ -1397,7 +1402,7 @@ void initialize_native_pins(){
 void initialize_i2c(){
 
   #ifdef DEBUG_REAL_DEEP_STUFF
-  Serial.println(F("initialize_i2c: entering"));
+    Serial.println(F("initialize_i2c: entering"));
   #endif
   
   Wire.begin();
@@ -1415,15 +1420,15 @@ void initialize_io_expander(byte i2c_addr){
   #endif
 
   #ifdef IO_EXPANDER_MCP23008
-  Wire.beginTransmission(i2c_addr);
-  Wire.write((byte) 0x00);                   // IODIR
-  Wire.write((byte) 0x00);                   
-  Wire.endTransmission();
+    Wire.beginTransmission(i2c_addr);
+    Wire.write((byte) 0x00);                   // IODIR
+    Wire.write((byte) 0x00);                   
+    Wire.endTransmission();
 
-  Wire.beginTransmission(i2c_addr);
-  Wire.write((byte) 0x09);                   // GPIO
-  Wire.write((byte) 0x00);                   
-  Wire.endTransmission();
+    Wire.beginTransmission(i2c_addr);
+    Wire.write((byte) 0x09);                   // GPIO
+    Wire.write((byte) 0x00);                   
+    Wire.endTransmission();
   #endif //IO_EXPANDER_MCP23008
 
 }
@@ -1445,14 +1450,14 @@ void i2c_expander_write(byte expander_number,byte value){
 
 
   #ifdef IO_EXPANDER_MCP23008
-  Wire.beginTransmission(i2c_expander_addr[expander_number]); 
-  Wire.write(0x09);
-  Wire.write(value);
-  Wire.endTransmission();
-  i2c_expander_pins[expander_number] = value;
+    Wire.beginTransmission(i2c_expander_addr[expander_number]); 
+    Wire.write(0x09);
+    Wire.write(value);
+    Wire.endTransmission();
+    i2c_expander_pins[expander_number] = value;
   #endif //IO_EXPANDER_MCP23008
   #ifdef I2C_POST_WRITE_DELAY
-  delay(I2C_POST_WRITE_DELAY);
+    delay(I2C_POST_WRITE_DELAY);
   #endif //I2C_POST_WRITE_DELAY
 }
 
@@ -1465,47 +1470,47 @@ void i2c_pin_write(byte pin_number,byte value){
   byte pin_value = 1;
 
   #ifdef IO_EXPANDER_MCP23008
-  byte expander_number = (pin_number - 1) / PINS_PER_IO_EXPANDER;
-  pin_number = pin_number - (expander_number * PINS_PER_IO_EXPANDER);
+    byte expander_number = (pin_number - 1) / PINS_PER_IO_EXPANDER;
+    pin_number = pin_number - (expander_number * PINS_PER_IO_EXPANDER);
 
-  pin_value = pin_value << (pin_number-1);
+    pin_value = pin_value << (pin_number-1);
 
-  if (value) {
-    i2c_expander_pins[expander_number] = i2c_expander_pins[expander_number] | pin_value;
-  } 
-  else {
-    i2c_expander_pins[expander_number] = i2c_expander_pins[expander_number] &  (~pin_value);
-  }
+    if (value) {
+      i2c_expander_pins[expander_number] = i2c_expander_pins[expander_number] | pin_value;
+    } 
+    else {
+      i2c_expander_pins[expander_number] = i2c_expander_pins[expander_number] &  (~pin_value);
+    }
 
-  #ifdef DEBUG_I2C_PIN_WRITE
-  Serial.print("i2c_pin_write: expander: ");
-  Serial.print(expander_number);
-  Serial.print(" i2c_address: ");
-  Serial.print(i2c_expander_addr[expander_number]);
-  Serial.print(" pin_number: ");
-  Serial.print(pin_number);
-  Serial.print(" expander_pins: ");
-  Serial.print(i2c_expander_pins[expander_number]);
-  Serial.print("    pin_value: ");
-  Serial.print(pin_value);
-  Serial.println();
-  unsigned long start_time  = millis();
-  #endif //DEBUG_I2C_PIN_WRITE
+    #ifdef DEBUG_I2C_PIN_WRITE
+      Serial.print("i2c_pin_write: expander: ");
+      Serial.print(expander_number);
+      Serial.print(" i2c_address: ");
+      Serial.print(i2c_expander_addr[expander_number]);
+      Serial.print(" pin_number: ");
+      Serial.print(pin_number);
+      Serial.print(" expander_pins: ");
+      Serial.print(i2c_expander_pins[expander_number]);
+      Serial.print("    pin_value: ");
+      Serial.print(pin_value);
+      Serial.println();
+      unsigned long start_time  = millis();
+    #endif //DEBUG_I2C_PIN_WRITE
 
-  Wire.beginTransmission(i2c_expander_addr[expander_number]); 
-  Wire.write(0x09);
-  Wire.write(i2c_expander_pins[expander_number]);
-  Wire.endTransmission();
-  
-  #ifdef I2C_POST_WRITE_DELAY
-  delay(I2C_POST_WRITE_DELAY);
-  #endif //I2C_POST_WRITE_DELAY
+    Wire.beginTransmission(i2c_expander_addr[expander_number]); 
+    Wire.write(0x09);
+    Wire.write(i2c_expander_pins[expander_number]);
+    Wire.endTransmission();
+    
+    #ifdef I2C_POST_WRITE_DELAY
+      delay(I2C_POST_WRITE_DELAY);
+    #endif //I2C_POST_WRITE_DELAY
 
-  #ifdef DEBUG_I2C_PIN_WRITE
-  Serial.print(F("i2c_pin_write: "));
-  Serial.print(millis()-start_time);
-  Serial.println(F(" mS"));
-  #endif //DEBUG_I2C_PIN_WRITE 
+    #ifdef DEBUG_I2C_PIN_WRITE
+      Serial.print(F("i2c_pin_write: "));
+      Serial.print(millis()-start_time);
+      Serial.println(F(" mS"));
+    #endif //DEBUG_I2C_PIN_WRITE 
 
   #endif //IO_EXPANDER_MCP23008
 }
@@ -2951,7 +2956,7 @@ void update_static_screen_tune_info(){
 #ifdef FEATURE_DISPLAY
 void update_static_screen_swr(){
   
-  char workstring[5] = "";
+  char workstring[8] = "";
  
   lcd.setCursor(0,0);            
   dtostrf(current_swr,4,2,workstring);

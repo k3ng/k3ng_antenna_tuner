@@ -13,7 +13,7 @@
 #define PENDING_IDLE_SWR_OK_TIME 1000        // the amount of time in mS we must see an OK SWR in order to go back to IDLE
 #define TARGET_SWR_GOOD_TIME 5000            // maximum time in mS to seek TARGET_SWR_GOOD
 #define TARGET_SWR_ACCEPTABLE_TIME 20000     // maximum time in mS to seek TARGET_SWR_ACCEPTABLE (essentially maximum tuning time) - must be greater than TARGET_SWR_GOOD_TIME
-#define UNTUNABLE_RETRY_TIME 5000            // if we couldn't find acceptablematch wait this many mS to attempt tuning again
+#define UNTUNABLE_RETRY_TIME 5000            // if we couldn't find acceptable match wait this many mS to attempt tuning again
 #define SERIAL_BAUD_RATE 115200              // baud rate of the native serial interface port
 #define LCD_COLUMNS 16                       // number of columns in the LCD display
 #define LCD_ROWS 2                           // number of rows in the LCD display
