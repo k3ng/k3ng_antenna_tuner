@@ -5,41 +5,14 @@
  Copyright 2013 and every year after that, Anthony Good, K3NG
  All trademarks referred to in source code and documentation are copyright their respective owners.
 
- ***************************************************************************************************************
 
-    This program is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
-    
-                              http://creativecommons.org/licenses/by-nc-sa/3.0/
-
-                          http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
-
-
- ***************************************************************************************************************
    
  Are you a radio artisan ?   
 
- 2015032701 : improved SWR formula from recommendation of Graeme, ZL2APV; DEBUG_MODE_DEFAULT
- 
-*/
-
-#define CODE_VERSION "2015032701"
-
-#define TWI_FREQ 100000L //100000L   // change this if you would like to speed up the I2C bus - this is the bus freq in hertz
-#include <Wire.h>                    // used for I2C functionality
-#include <LiquidCrystal.h>         // uncomment for FEATURE_DISPLAY and when using a regular LCD in 4 bit mode
-#include <FreqCounter.h>             // uncomment for FEATURE_FREQ_COUNTER
-#include <avr/sleep.h>               // uncomment for FEATURE_SLEEP_MODE
-#include <EEPROM.h>
-#include <avr/pgmspace.h>
-#include <avr/wdt.h>             
-#include <Adafruit_MCP23017.h>       // uncomment for FEATURE_DISPLAY in combination with FEATURE_LCD_I2C
-#include <Adafruit_RGBLCDShield.h>   // uncomment for FEATURE_DISPLAY in combination with FEATURE_LCD_I2C
-#include <SoftwareSerial.h>          // needed for rigs not using native hardware serial ports
-#include "k3ng_rig_control.h"
-
 
 // TODO 
-//   - Kenwood, Icom support
+//   - TEST Hardware serial in k3ng_rig_control library (only SoftwareSerial is tested!!!)
+//   - Kenwood, Icom rig support
 //   - Single LED Indicator
 //   - LCD menu
 //   - LCD status messages
@@ -48,148 +21,70 @@
 //   - parse macros for native pins that are used and initialize them
 //   - handle high voltage in measure_swr()
 //   - schematic: ASR disable with cap
-//   - read Yaesu SWR?
 //   - buffer clean out for one band
 //   - overwrite same frequency entries in tune_buffer_add?
 //   - CLI rig switching and current_rig switching
-//   - option to use hardware serial ports on Mega
 
 
 
+  x.x.2015032701
+    Improved SWR formula from recommendation of Graeme, ZL2APV; DEBUG_MODE_DEFAULT
 
-// To override the pin settings and hardware configuration below, update the lines below to where your personal pins.h and hardware.h filea are located
+  2.0.2016032001
+    Starting development branch and 2.0 version to handle latching relays and the MCP23017
 
-//#include "C:\Users\goody\Documents\Arduino Sketchbook\tuner\pins.h"       // In the file, create this line: "#define pins_h" (no quotes)
-//#include "C:\Users\goody\Documents\Arduino Sketchbook\tuner\hardware.h"   // In the file, create this line: "#define hardware_h" (no quotes)
+  2.0.2016051501   
+    Replaced frequency counter library (Thanks Joe, VE3VXO) 
 
-// administrative and control pin definitions (not I2C expander pins)
-#ifndef pins_h
-#define pin_led 13
-#define pin_tune_in_progress 0   // indicator - goes high when tuning (0 = disable)
-#define pin_tuned 0              // indicator - goes high when tuned (0 = disable)
-#define pin_untunable 0          // indicator - goes high when untunable (0 = disable)
-#define pin_frequency_counter 5  // input - frequency counter (dummy entry - hard coded in frequency counter library)
-#define pin_tune_lock 0          // input - ground to lock tuning (0 = disable)
-#define pin_forward_v  A0        // input (analog) - SWR sensor forward voltage
-#define pin_reflected_v A1       // input (analog) - SWR sensor reverse voltage
-#define pin_voltage_control 7    // output - controls SWR sensor voltage attenuator
-#define pin_wakeup 2             // input - use with FEATURE_SLEEP_MODE - low wakes unit up
-#define pin_awake 0              // output - use with FEATURE_SLEEP_MODE - goes high when unit is awake (0 = disable)
-#define pin_manual_tune 0        // input - ground to initiate tuning (0 = disable)
-#define rig_0_control_tx A2      // rig serial port - rig RX line / Arduino TX line
-#define rig_0_control_rx A3      // rig serial port - rig TX line / Arduino RX line
-#endif //pins_h
-// end of adminitrative and control pin definitions
+  2.0.2016051502
+    New frequency counter library - forgot to copy over initialization code  
 
+  2.0.2016092701
+    update_static_screen_swr() - increased size of workstring (thanks, Jim - G3ZQC)
 
-#define FEATURE_DISPLAY
-#define FEATURE_LCD_I2C
-#define FEATURE_SERIAL
-#define FEATURE_SERIAL_HELP
-#define FEATURE_COMMAND_LINE_INTERFACE
-#define FEATURE_FREQ_COUNTER
-//#define FEATURE_RECEIVE_BYPASS
-//#define FEATURE_SLEEP_MODE
-//#define FEATURE_RIG_INTERFACE
-//#define FEATURE_RECEIVE_FREQ_AUTOSWITCH
-//#define FEATURE_RIG_CONTROL_PASS_THROUGH   // this works best when serial port and rig port baud are the same
-#define FEATURE_LCD_I2C_STATUS_COLOR
+  2018.03.17.01
+    New version schema
+    Various code cleanup items
 
+  2023.10.10.0043
+    Updated license
+    Working on updating code for Arduino Mega (no longer supporting Uno)
 
-// Dependency checking
-#ifdef FEATURE_RIG_CONTROL_PASS_THROUGH
-#undef FEATURE_COMMAND_LINE_INTERFACE
-#endif //FEATURE_RIG_CONTROL_PASS_THROUGH
-//-
-#ifdef FEATURE_RECEIVE_FREQ_AUTOSWITCH
-#ifndef FEATURE_RIG_INTERFACE
-#error FEATURE_RECEIVE_FREQ_AUTOSWITCH requires FEATURE_RIG_INTERFACE
-#endif
-#endif
-// End - dependency checking
+*/
 
+#define CODE_VERSION "2023.10.10.0043"    
 
-// Rig definitions
-SoftwareSerial rig0serial(rig_0_control_rx,rig_0_control_tx);
-Rig rig0(&rig0serial,YAESU);
-//SoftwareSerial rig1serial(rig_1_control_rx,rig_1_control_tx);
-//Rig rig1(&rig1serial,YAESU);
-//SoftwareSerial rig2serial(rig_2_control_rx,rig_2_control_tx);
-//Rig rig2(&rig2serial,YAESU);
-Rig *rig[] = {&rig0};  /*Rig *rig[] = {&rig0,&rig1,&rig3};*/
-#define RIGS 1
+#include "tuner_config_pins.h"
+#include "tuner_config_features.h"
 
-// set rig baud rates below, look for rig_baud[]
+#include "tuner_dependencies.h"
 
+#include "tuner_debug.h"
 
-#define OPTION_WRITE_CONFIG_BEFORE_SLEEP             // write the configuration and tune buffer to EEPROM before going to sleep (probably a good idea)
-#define OPTION_TUNE_BUFFER_ENTRY_USE_ACCEPTABLE_SWR  // when trying tune buffer entry, use TARGET_SWR_ACCEPTABLE_SETTING threshold (improves tune times)
+#include "tuner_config_settings.h"    
 
+#include <Wire.h>                    // used for I2C functionality
 
-// debug switches - don't turn these on unless you know what the hell you are doing or you want to get into the inner guts of the code
-//#define DEBUG_I2C_PIN_WRITE
-//#define DEBUG_EEPROM
-//#define DEBUG_RELAY_TEST
-//#define DEBUG_COMMAND_BUFFER
-//#define DEBUG_MEASURE_SWR
-#define DEBUG_STATUS_DUMP
-//#define DEBUG_STATUS_DUMP_SWR_CACHE
-#define DEBUG_CHECK_STATE
-//#define DEBUG_SERVICE_TUNING
-//#define DEBUG_SERVICE_TUNING_VERBOSE_FREQ
-//#define DEBUG_RIG
-//#define DEBUG_RECEIVE_FREQ_AUTOSWITCH
-//#define DEBUG_TUNE_BUFFER
-//#define DEBUG_REAL_DEEP_STUFF
-//#define DEBUG_DONT_TUNE
-//#define DEBUG_NO_FREQ
-//#define DEBUG_SERIAL
+#define TWI_FREQ 100000L //100000L   // change this if you would like to speed up the I2C bus - this is the bus freq in hertz
 
-// various settings
-// Some of these are rather obtuse or obscure.  Read the manual to fully understand what these do if you're going to tweak the knobs
-//
-#define TARGET_SWR_GOOD_SETTING 1.2          // the SWR we would like to get
-#define TARGET_SWR_ACCEPTABLE_SETTING 1.8    // the SWR we'll settle for
-#define SWR_TRIGGER_TUNE 2.0 //2.4                 // the point at which the tuner will automatically start tuning
-#define SWR_TRIGGER_TIME_MS 1000             // how long we have to be above the trigger point to start tuning (milliseconds)
-#define SWR_OF_LAST_RESORT_CONSIDER_TUNED 2.5 //2.9 // if we run out of tuning combinations and settle for the best match we found, consider it tuned if better or equal to this SWR
-#define SWR_OF_LAST_RESORT_KHZ_TUNED 50      // if we setted for SWR or last resort, consider it tuned with this many khz of the original tune frequency
-#define TRANSMIT_STOP_GOTO_IDLE_TIME_MS 2000 // if tuning and the TX stops, wait this long before going back into idle mode
-#define PENDING_IDLE_SWR_OK_TIME 1000        // the amount of time in mS we must see an OK SWR in order to go back to IDLE
-#define TARGET_SWR_GOOD_TIME 5000            // maximum time in mS to seek TARGET_SWR_GOOD
-#define TARGET_SWR_ACCEPTABLE_TIME 20000     // maximum time in mS to seek TARGET_SWR_ACCEPTABLE (essentially maximum tuning time) - must be greater than TARGET_SWR_GOOD_TIME
-#define UNTUNABLE_RETRY_TIME 5000            // if we couldn't find acceptablematch wait this many mS to attempt tuning again
-#define SERIAL_BAUD_RATE 115200              // baud rate of the native serial interface port
-#define LCD_COLUMNS 16                       // number of columns in the LCD display
-#define LCD_ROWS 2                           // number of rows in the LCD display
-#define DISPLAY_STATIC_SCREEN_UPDATE_MS 1000 // how often the LCD is updated, time in mS
-#define FREQ_COUNTER_GATE_TIME 1             // amount of time in mS to sample the frequency
-#define I2C_LCD_N_BUTTONS_ADDRESS 0x20       // I2C address of the LCD display
-#define EEPROM_MAGIC_NUMBER 74               // first byte of EEPROM; used to determine if we have a valid EEPROM structure
-#define EEPROM_WRITE_WAIT_MS 5000 //60000
-#define COMMAND_BUFFER_SIZE 56
-#define SWR_HISTORY_CACHE_SIZE 10
-#define SWR_SAMPLE_TIME_MS 0 //1 //5 //10    // wait this many mS in between taking SWR samples
-#define MINIMUM_SWR_SAMPLE_COUNT 3           // take this many SWR samples and average them together before considering it a good SWR reading
-#define RELAY_SETTLE_TIME_MS 25 //9               // this is the maximum engage / disengage time of the relays (consult the datasheet for the particular relay you use)
-#define FORWARD_V_TX_SENSE_THRESH 6          // above this threshold on the analog forward V line, consider the transmitter on (unit is thhe straight analog reading)
-#define RECEIVE_BYPASS_DELAY 200             // use with FEATURE_RECEIVE_BYPASS - the amount of time in mS to wait for the TX to be off to switch to RX bypass
-#define GO_TO_SLEEP_TIMER 5000               // use with FEATURE_SLEEP_MODE - the amount of time in mS of inactivity before we go to sleep
-#define TUNE_BUFFER_SIZE 18                  // the number of tuning combinations we store in RAM and EEPROM
-#define TUNE_BUFFER_ADD_MATCH_THRESH_KHZ 50  // if we don't have a tune match within this many khz, add it to the tune buffer
-#define TUNE_BUFFER_MATCH_THRESH_KHZ 300     // when doing a tune, try all tune buffer entries within this many khz of the current tx freq
-#define I2C_POST_WRITE_DELAY 1               // wait this many mS after doing an I2C write
-#define RIG_FREQ_REFRESH_TIME_MS 5000        // request the freq from a rig every x mS
-#define RX_FREQ_AUTOSWITCH_TIME_THRESH 0              // wait this many mS to check again for autoswitch
-#define RX_FREQ_AUTOSWITCH_FREQ_THRESH_KHZ 100        // trigger ann autoswitch search if RX freq changes this many khz
-#define RX_FREQ_AUTOSWITCH_TUNE_MATCH_KHZ_THRESH 500  // choose the closest match in the tune combination buffer within this many khz of the current RX freq
-#define RX_FREQ_AUTOSWITCH_WAIT_TIME_FREQ_CHANGE 500  // wait x mS after freq change to trigger rx tune autoswitch
-#define EEPROM_BYTES 1024                    // number of bytes in EEPROM - TODO - get this automagically at compile time?
-#define HI_L_C_INCREMENT 100                 // pF
-#define HI_L_L_INCREMENT 200                 // uH * 100
-#define DEBUG_STATUS_DUMP_FREQ_MS 500        // how often to do a periodic status dump
-#define DEBUG_STATUS_DUMP_DELAY 0            // delay this many seconds after doing a status dump (only for debug purposes)
-#define DEBUG_MODE_DEFAULT 0
+#if defined(FEATURE_DISPLAY) && !defined(FEATURE_LCD_I2C)
+  #include <LiquidCrystal.h>         // uncomment for FEATURE_DISPLAY and when using a regular LCD in 4 bit mode
+#endif    
+#if defined(FEATURE_FREQ_COUNTER)
+  #include <FreqCount.h>             // uncomment for FEATURE_FREQ_COUNTER   
+#endif    
+#include <avr/sleep.h>               // uncomment for FEATURE_SLEEP_MODE
+#include <EEPROM.h>
+#include <avr/pgmspace.h>
+#include <avr/wdt.h>         
+#if defined(FEATURE_DISPLAY) && defined(FEATURE_LCD_I2C)   
+  #include <Adafruit_MCP23017.h>       // uncomment for FEATURE_DISPLAY in combination with FEATURE_LCD_I2C
+  #include <Adafruit_RGBLCDShield.h>   // uncomment for FEATURE_DISPLAY in combination with FEATURE_LCD_I2C
+#endif    
+#if defined(FEATURE_RIG_INTERFACE)    
+  #include <SoftwareSerial.h>          // needed for rigs not using native hardware serial ports
+  #include "k3ng_rig_control.h"
+#endif    
 
 
 
@@ -204,10 +99,6 @@ enum swr_targets {TARGET_SWR_GOOD, TARGET_SWR_ACCEPTABLE};
 enum adjust_component {INDUCTOR, CAPACITOR};
 enum adjust_adjustment_type {STEP, ABSOLUTE, RELATIVE, SINGLE};
 enum tuning_flag_type {TUNING_FLAG_NONE,TUNING_FLAG_TUNE_BUFFER_SWR_ACCEPT};
-
-// LCD definitions
-//LiquidCrystal lcd(12, 11, 10, 9, 8, 7);                 // uncomment this for a regular LCD display
-Adafruit_RGBLCDShield lcd = Adafruit_RGBLCDShield();      // uncomment this for FEATURE_LCD_I2C (address 0x21)
 
 byte state_tuner = IDLE;
 float current_swr = 0;
@@ -233,22 +124,17 @@ unsigned int last_known_good_freq = 0;
 byte tuning_flag = TUNING_FLAG_NONE;
 byte current_antenna = 1;
 byte current_transmitter = 1;
-
-#ifdef DEBUG_SERVICE_TUNING
-byte debug_service_tune_buffer_swr_measure_flag = 0;
-#endif //DEBUG_SERVICE_TUNING
-
-#ifdef FEATURE_RECEIVE_FREQ_AUTOSWITCH
-byte receive_freq_autoswitch_active = 1;
-#endif //FEATURE_RECEIVE_FREQ_AUTOSWITCH
-
-#ifdef FEATURE_COMMAND_LINE_INTERFACE
-byte cli_command_buffer[50];
-int cli_command_buffer_index = 0;
-
-#endif //FEATURE_COMMAND_LINE_INTERFACE
-
 byte periodic_print_status = 0;
+int forward_voltage = 0;
+int reverse_voltage = 0;
+float forward_power = 0;
+float history_swr[SWR_HISTORY_CACHE_SIZE];
+float history_forward_power[SWR_HISTORY_CACHE_SIZE];
+byte transmit_sense = 0;
+
+//float frequencies[]             = {1.8,   3.5,  7.0, 10.1, 14.0,  18.0,  21.0,  24.5,  28.0};
+//float fwd_power_calibarations[] = {50.0, 27.7, 25.0, 25.0,  5.0, 0.833, 0.446, 0.217, 0.053};
+//int number_calibrations_frequencies = 9;
 
 struct config_t {
   byte magic_number;
@@ -277,199 +163,183 @@ struct tune_buffer_t {   // tune buffer - this stores succesful tuning combinati
   unsigned int swr;   // SWR * 100
 } tune_buffer[TUNE_BUFFER_SIZE];
 
+#ifdef DEBUG_SERVICE_TUNING
+  byte debug_service_tune_buffer_swr_measure_flag = 0;
+#endif //DEBUG_SERVICE_TUNING
+
+#ifdef FEATURE_RECEIVE_FREQ_AUTOSWITCH
+  byte receive_freq_autoswitch_active = 1;
+#endif //FEATURE_RECEIVE_FREQ_AUTOSWITCH
+
+#ifdef FEATURE_COMMAND_LINE_INTERFACE
+  byte cli_command_buffer[50];
+  int cli_command_buffer_index = 0;
+#endif //FEATURE_COMMAND_LINE_INTERFACE
 
 #ifdef FEATURE_RIG_INTERFACE
-unsigned long rig_last_freq_request_time[RIGS];
-unsigned int rig_baud[] = {9600};    // multiple rig example: unsigned int rig_baud[] = {9600, 4800, 38400};
-byte current_rig = 0;                // 0 = rig #1, 1 = rig #2, etc.
+  unsigned long rig_last_freq_request_time[RIGS];
+  unsigned int rig_baud[] = {9600};    // multiple rig example: unsigned int rig_baud[] = {9600, 4800, 38400};
+  byte current_rig = 0;                // 0 = rig #1, 1 = rig #2, etc.
 #endif //FEATURE_RIG_INTERFACE
 
-
 #ifdef FEATURE_RECEIVE_BYPASS
-byte receive_bypass = 0;  // turn on receive bypass mode here (TODO - user activation / deactivation & EEPROM storage)
-byte in_receive_bypass = 0;
+  byte receive_bypass = 0;  // turn on receive bypass mode here (TODO - user activation / deactivation & EEPROM storage)
+  byte in_receive_bypass = 0;
 #endif //FEATURE_RECEIVE_BYPASS
 
-// hardware configuration
-#ifndef hardware_h
-const byte i2c_expander_addr[] = {0x21, 0x22};  // i2c addresses of I/O expanders # 0, 1, 2, etc...
-byte i2c_expander_pins[] = {0, 0};              // stores the current state of the I/O expander pins
-#define IO_EXPANDERS 2
-/*
-
- Here's how to define three IO Expanders:
-
-const byte i2c_expander_addr[] = {0x21, 0x22, 0x23};  // i2c addresses of I/O expanders # 0, 1, 2, etc...
-byte i2c_expander_pins[] = {0, 0, 0};                 // stores the current state of the I/O expander pins
-#define IO_EXPANDERS 3
-
-*/
-#define PINS_PER_IO_EXPANDER 8  // number of output on each IO expander
-#define IO_EXPANDER_MCP23008    // current the code supports just the Microchip MCP23008
-
-/* quick macro howto:
-
-      ! = activate I2C pin
-      . = deactive I2C pin
-      + = activate native pin
-      - = deactive native pin
-
-
-*/
-//       Inductor definitions           L1  L2  L3  L4    L5    L6    L7    L8   
-const unsigned int inductor_values[] = { 8, 16, 32, 64,  130,  260,  520, 1040 };        // inductor values in nH
-char* inductor_activate_macros[]   = {"!08","!07","!06","!05","!04","!03","!02","!01"};  // macros to activate inductor relays 
-char* inductor_deactivate_macros[] = {".08",".07",".06",".05",".04",".03",".02",".01"};  // macros to deactivate inductor relays
-byte inductor_status[]             = {0,0,0,0,0,0,0,0};
-#define INDUCTORS 8
-#define TOTAL_INDUCTOR_VALUE 2070
-//        Capacitor definitions           C1    C2    C3    C4     C5    C6    C7    C8
-const unsigned int capacitor_values[] = { 12,   22,   39,   82,   150,  300,  600, 1200 };  // capacitor values in pF
-char* capacitor_activate_macros[]     = {"!16","!15","!14","!13","!12","!11","!10","!09"}; // macros to activate capacitor relays
-char* capacitor_deactivate_macros[]   = {".16",".15",".14",".13",".12",".11",".10",".09"}; // macros to deactivate capacitor relays
-byte capacitor_status[]               = {0,0,0,0,0,0,0,0};
-#define CAPACITORS 8
-#define TOTAL_CAPACITOR_VALUE 2405
-//
-char* tuning_mode_names[] =             {"HiZ",   "LoZ"};
-char* tuning_mode_activate_macros[] =   {"-04+03","-03+04"};
-char* tuning_mode_deactivate_macros[] = {"-03",   "-04"};
-/* if using three IO expanders:
-char* tuning_mode_activate_macros[] =   {"!24",   "!23"};
-char* tuning_mode_deactivate_macros[] = {".24",   ".23"};   */
-//                          tuning mode:   1         2
-byte tuning_mode_status[] = {0,0};
-#define TUNING_MODES 2
-//
-char* tx_switch_names[]  = {"TX1",   "TX2"};
-char* tx_switch_macros[] = {"-09+08","-08+09"};
-#define TXS 0                     // in development - transmitter switch functionality
-//                                  
-char* antenna_switch_names[] =  {"ANT1",  "ANT2"};
-char* antenna_switch_macros[] = {".20!19",".19!20"};
-#define ANTENNAS 0                // in development - antenna switch functionality
-#endif //hardware_h
-// end of hardware configuration
-
-int forward_voltage = 0;
-int reverse_voltage = 0;
-float forward_power = 0;
-float history_swr[SWR_HISTORY_CACHE_SIZE];
-float history_forward_power[SWR_HISTORY_CACHE_SIZE];
-byte transmit_sense = 0;
-
-//float frequencies[]             = {1.8,   3.5,  7.0, 10.1, 14.0,  18.0,  21.0,  24.5,  28.0};
-//float fwd_power_calibarations[] = {50.0, 27.7, 25.0, 25.0,  5.0, 0.833, 0.446, 0.217, 0.053};
-//int number_calibrations_frequencies = 9;
-
+#include "tuner_config_tuner_hardware.h"
 
 #ifdef FEATURE_FREQ_COUNTER
-float frequency_counter_calibration = 0.985836;
-unsigned int last_measured_frequency = 0;
+  float frequency_counter_calibration = FREQUENCY_COUNTER_CALIBRATION;
+  unsigned int last_measured_frequency = 0;
 #endif //FEATURE_FREQ_COUNTER
 
 #ifdef FEATURE_SLEEP_MODE
-unsigned long last_activity_time = 0;
-byte sleep_disabled = 0;
+  unsigned long last_activity_time = 0;
+  byte sleep_disabled = 0;
 #endif //FEATURE_SLEEP_MODE
 
 
-
 #ifdef FEATURE_DISPLAY
-enum lcd_statuses {LCD_CLEAR, LCD_REVERT, LCD_TIMED_MESSAGE, LCD_SCROLL_MSG, LCD_STATIC};
-#define default_display_msg_delay 1000
-byte lcd_status = LCD_STATIC;
-unsigned long lcd_timed_message_clear_time = 0;
-byte lcd_previous_status = LCD_STATIC;
-byte lcd_scroll_buffer_dirty = 0;
-String lcd_scroll_buffer[LCD_ROWS];
-byte lcd_scroll_flag = 0;
-#ifdef FEATURE_LCD_I2C
-#define RED 0x1
-#define YELLOW 0x3
-#define GREEN 0x2
-#define TEAL 0x6
-#define BLUE 0x4
-#define VIOLET 0x5
-#define WHITE 0x7
-byte lcdcolor = GREEN;  // default color of I2C LCD display
-#define LCD_I2C_STATUS_COLOR_TUNED 0x2     // used by FEATURE_LCD_I2C_STATUS_COLOR
-#define LCD_I2C_STATUS_COLOR_UNTUNED 0x1   // used by FEATURE_LCD_I2C_STATUS_COLOR
-#define LCD_I2C_STATUS_COLOR_TUNING 0x4    // used by FEATURE_LCD_I2C_STATUS_COLOR
-#endif //FEATURE_LCD_I2C
+  enum lcd_statuses {LCD_CLEAR, LCD_REVERT, LCD_TIMED_MESSAGE, LCD_SCROLL_MSG, LCD_STATIC};
+  #define default_display_msg_delay 1000
+  byte lcd_status = LCD_STATIC;
+  unsigned long lcd_timed_message_clear_time = 0;
+  byte lcd_previous_status = LCD_STATIC;
+  byte lcd_scroll_buffer_dirty = 0;
+  String lcd_scroll_buffer[LCD_ROWS];
+  byte lcd_scroll_flag = 0;
+  #ifdef FEATURE_LCD_I2C
+    #define RED 0x1
+    #define YELLOW 0x3
+    #define GREEN 0x2
+    #define TEAL 0x6
+    #define BLUE 0x4
+    #define VIOLET 0x5
+    #define WHITE 0x7
+    byte lcdcolor = GREEN;  // default color of I2C LCD display
+    #define LCD_I2C_STATUS_COLOR_TUNED 0x2     // used by FEATURE_LCD_I2C_STATUS_COLOR
+    #define LCD_I2C_STATUS_COLOR_UNTUNED 0x1   // used by FEATURE_LCD_I2C_STATUS_COLOR
+    #define LCD_I2C_STATUS_COLOR_TUNING 0x4    // used by FEATURE_LCD_I2C_STATUS_COLOR
+  #endif //FEATURE_LCD_I2C
 #endif //FEATURE_DISPLAY
 
-/* here's where it all starts */
+
+// LCD definitions
+#if defined(FEATURE_DISPLAY) && !defined(FEATURE_LCD_I2C)
+  LiquidCrystal lcd(12, 11, 10, 9, 8, 7);  
+#endif              
+#if defined(FEATURE_DISPLAY) && defined(FEATURE_LCD_I2C) 
+  Adafruit_RGBLCDShield lcd = Adafruit_RGBLCDShield();      // uncomment this for FEATURE_LCD_I2C (address 0x21)
+#endif  
+
+
+#if defined(FEATURE_RIG_INTERFACE) 
+  // Rig definitions
+
+  //Software serial port example
+  SoftwareSerial rig0serial(rig_0_control_rx,rig_0_control_tx);
+  Rig rig0(&rig0serial,YAESU);
+
+  // Hardware serial port example
+  //Rig rig0(&Serial1,YAESU);  
+
+  //SoftwareSerial rig1serial(rig_1_control_rx,rig_1_control_tx);
+  //Rig rig1(&rig1serial,YAESU);
+  //SoftwareSerial rig2serial(rig_2_control_rx,rig_2_control_tx);
+  //Rig rig2(&rig2serial,YAESU);
+  Rig *rig[] = {&rig0};  /*Rig *rig[] = {&rig0,&rig1,&rig3};*/
+  #define RIGS 1
+
+  // set rig baud rates below, look for rig_baud[]
+#endif 
+
+//-----------------------------------------------------------------------------------------------------
+//
+//
+//                                            here's where it all starts
+//
+//
+//-----------------------------------------------------------------------------------------------------
+
+
 
 void setup() {
 
   #ifdef FEATURE_SERIAL
-  initialize_serial();
+    initialize_serial();
   #endif //FEATURE_SERIAL
 
   initialize_native_pins();
   initialize_i2c();
 
   #ifdef FEATURE_DISPLAY
-  initialize_display();
-  display_startup_message();
+    initialize_display();
+    display_startup_message();
   #endif //FEATURE_DISPLAY
   
   
   #ifdef FEATURE_RIG_INTERFACE
-  initialize_rigs();  
+    initialize_rigs();  
   #endif //FEATURE_RIG_INTERFACE
 
   #ifdef DEBUG_RELAY_TEST
-  relay_test();
+    relay_test();
   #endif //DEBUG_RELAY_TEST
   
   tune_buffer_clear();
   initialize_settings_from_eeprom();
 
-  
   #ifdef FEATURE_FREQ_COUNTER
-  initialize_freq_counter();
+    initialize_freq_counter();
   #endif //FEATURE_FREQ_COUNTER
   
   #ifdef DEBUG_REAL_DEEP_STUFF
-  Serial.println(F("setup: going into loop"));
+    Serial.println(F("setup: going into loop"));
   #endif //DEBUG_REAL_DEEP_STUFF
   
-
 }
 
-/* the code was always there, I just removed the excess ones and zeros to form it */
+
+//-----------------------------------------------------------------------------------------------------
+//
+//
+//       the magic
+//
+//
+//-----------------------------------------------------------------------------------------------------
+
+
 
 void loop() {
  
   
   #ifndef DEBUG_DONT_TUNE 
-  check_state();
-  measure_swr();
-  check_relay_status();
-  check_for_dirty_configuration();
+    check_state();
+    measure_swr();
+    check_relay_status();
+    check_for_dirty_configuration();
   #endif //DEBUG_DONT_TUNE
 
   #ifdef FEATURE_DISPLAY
-  //check_display_buttons();
-  service_display();
+    //check_display_buttons();
+    service_display();
   #endif
 
   process_command_buffer();
   check_serial();
   
   #ifdef FEATURE_RECEIVE_BYPASS
-  check_receive_bypass();
+    check_receive_bypass();
   #endif //FEATURE_RECEIVE_BYPASS
   
   #ifdef FEATURE_RIG_INTERFACE
-  service_rigs();
-  get_rig_frequencies();
+    service_rigs();
+    get_rig_frequencies();
   #endif //FEATURE_RIG_INTERFACE
 
   #ifdef FEATURE_RECEIVE_FREQ_AUTOSWITCH  
-  check_receive_freq_autoswitch();
+    check_receive_freq_autoswitch();
   #endif //FEATURE_RECEIVE_FREQ_AUTOSWITCH
 
 }
@@ -495,12 +365,12 @@ void check_state(){
   byte trigger_tune = 0;
 
   #ifdef DEBUG_STATUS_DUMP
-  static unsigned long last_debug_dump = 0;
-  byte debug_printed = 0;
+    static unsigned long last_debug_dump = 0;
+    byte debug_printed = 0;
   #endif //DEBUG_STATUS_DUMP
 
   #ifdef DEBUG_REAL_DEEP_STUFF
-  Serial.println(F("check_state: entering"));
+    Serial.println(F("check_state: entering"));
   #endif
   
   #ifdef DEBUG_CHECK_STATE
@@ -527,13 +397,13 @@ void check_state(){
   if ((lock_invoke) && (state_tuner != LOCK)) {
     state_tuner = LOCK;
     #ifdef FEATURE_SLEEP_MODE
-    last_activity_time = millis();
+      last_activity_time = millis();
     #endif    
   }
   if ((lock_invoke) && (unlock_invoke) && (state_tuner == LOCK)) {
     state_tuner = IDLE;           
     #ifdef FEATURE_SLEEP_MODE
-    last_activity_time = millis();
+      last_activity_time = millis();
     #endif
     lock_invoke = 0;
     unlock_invoke = 0;
@@ -565,18 +435,18 @@ void check_state(){
         if (current_swr > SWR_TRIGGER_TUNE) {
           trigger_tune = 1; 
           #ifdef DEBUG_CHECK_STATE
-          if ((debug_mode) && ((millis() - last_debug_check_state_print) > 1000)){
-            Serial.println(F("check_state: current_swr > SWR_TRIGGER_TUNE"));
-            debug_printed = 1;
-          }        
+            if ((debug_mode) && ((millis() - last_debug_check_state_print) > 1000)){
+              Serial.println(F("check_state: current_swr > SWR_TRIGGER_TUNE"));
+              debug_printed = 1;
+            }        
           #endif   
         } else {
           
           #ifdef DEBUG_CHECK_STATE
-          if ((debug_mode) && ((millis() - last_debug_check_state_print) > 1000)){
-            Serial.println(F("check_state: current_swr < SWR_TRIGGER_TUNE"));
-            debug_printed = 1;
-          }        
+            if ((debug_mode) && ((millis() - last_debug_check_state_print) > 1000)){
+              Serial.println(F("check_state: current_swr < SWR_TRIGGER_TUNE"));
+              debug_printed = 1;
+            }        
           #endif           
         }
           
@@ -594,10 +464,10 @@ void check_state(){
         if ((SWR_OF_LAST_RESORT_CONSIDER_TUNED > 0) && (current_swr <= SWR_OF_LAST_RESORT_CONSIDER_TUNED)&&(abs(tuned_freq - current_freq()) < SWR_OF_LAST_RESORT_KHZ_TUNED) && 
         ((tuning_phase == PHASE_7_LAST_RESORT)  || (tuning_phase == PHASE_999_THE_END))) {
           #ifdef DEBUG_CHECK_STATE
-          if ((debug_mode) && ((millis() - last_debug_check_state_print) > 1000)){
-            Serial.println(F("check_state: within SWR_OF_LAST_RESORT_CONSIDER_TUNED"));
-            last_debug_check_state_print = millis();
-          }  
+            if ((debug_mode) && ((millis() - last_debug_check_state_print) > 1000)){
+              Serial.println(F("check_state: within SWR_OF_LAST_RESORT_CONSIDER_TUNED"));
+              last_debug_check_state_print = millis();
+            }  
           #endif          
           trigger_tune = 0;
         }
@@ -617,13 +487,13 @@ void check_state(){
               tuning_start_time = millis();
               set_indicators(TUNE_IN_PROGRESS);   
               #ifdef DEBUG_CHECK_STATE
-              if (debug_mode) {
-                Serial.print(F("check_state: start TUNING swr: "));
-                Serial.println(current_swr);
-              }
+                if (debug_mode) {
+                  Serial.print(F("check_state: start TUNING swr: "));
+                  Serial.println(current_swr);
+                }
               #endif //DEBUG_CHECK_STATE
               #ifdef FEATURE_DISPLAY
-              update_static_screen(1);
+                update_static_screen(1);
               #endif //FEATURE_DISPLAY               
             }
           }           
@@ -632,14 +502,14 @@ void check_state(){
         } // (trigger_tune)
           
         #ifdef FEATURE_SLEEP_MODE
-        last_activity_time = millis();
+          last_activity_time = millis();
         #endif
       } else {
         swr_trigger_start_time = 0;
       } // (transmit_sense)
       
       #ifdef DEBUG_CHECK_STATE
-      if (debug_printed) {last_debug_check_state_print = millis();}
+        if (debug_printed) {last_debug_check_state_print = millis();}
       #endif
       break;
   
@@ -1413,7 +1283,7 @@ byte adjust(byte component, byte adjustment_type, unsigned int amount){
 void check_relay_status(){
   
   #ifdef DEBUG_REAL_DEEP_STUFF
-  Serial.println(F("check_relay_status: entering"));
+    Serial.println(F("check_relay_status: entering"));
   #endif
   
   if ((relay_status == RELAY_SETTLE) && ((millis() - relay_settle_start_time) >= RELAY_SETTLE_TIME_MS)){
@@ -1425,7 +1295,7 @@ void check_relay_status(){
 void initiate_relay_settle(){
 
   #ifdef DEBUG_REAL_DEEP_STUFF
-  Serial.println(F("initiate_relay_settle: entering"));
+    Serial.println(F("initiate_relay_settle: entering"));
   #endif
   
   relay_status = RELAY_SETTLE;
@@ -1460,19 +1330,26 @@ unsigned int current_L(){
   return return_value;
 }  
 //-----------------------------------------------------------------------------------------------------
+#ifdef FEATURE_FREQ_COUNTER
 void initialize_freq_counter(){
   
   #ifndef DEBUG_NO_FREQ
-  #ifdef DEBUG_REAL_DEEP_STUFF
-  Serial.println(F("initialize_freq_counter: doing freq reads"));
-  #endif  //DEBUG_REAL_DEEP_STUFF
-  
-  for (byte x = 0;x < 3; x++) {  // do a few reads just to blow the dust out
-    current_freq();
-  }
+    #ifdef DEBUG_REAL_DEEP_STUFF
+      Serial.println(F("initialize_freq_counter: doing freq reads"));
+    #endif  //DEBUG_REAL_DEEP_STUFF
+    
+    #if !defined(OPTION_USE_OLD_FREQ_COUNTER_LIBRARY)
+      FreqCount.begin(FREQ_COUNTER_GATE_TIME);
+    #endif
+
+
+    for (byte x = 0;x < 3; x++) {  // do a few reads just to blow the dust out
+      current_freq();
+    }
   #endif //DEBUG_NO_FREQ
 
-}  
+}
+#endif //FEATURE_FREQ_COUNTER  
 
 //-----------------------------------------------------------------------------------------------------
 void initialize_native_pins(){
@@ -1538,7 +1415,7 @@ void initialize_native_pins(){
 void initialize_i2c(){
 
   #ifdef DEBUG_REAL_DEEP_STUFF
-  Serial.println(F("initialize_i2c: entering"));
+    Serial.println(F("initialize_i2c: entering"));
   #endif
   
   Wire.begin();
@@ -1556,15 +1433,15 @@ void initialize_io_expander(byte i2c_addr){
   #endif
 
   #ifdef IO_EXPANDER_MCP23008
-  Wire.beginTransmission(i2c_addr);
-  Wire.write((byte) 0x00);                   // IODIR
-  Wire.write((byte) 0x00);                   
-  Wire.endTransmission();
+    Wire.beginTransmission(i2c_addr);
+    Wire.write((byte) 0x00);                   // IODIR
+    Wire.write((byte) 0x00);                   
+    Wire.endTransmission();
 
-  Wire.beginTransmission(i2c_addr);
-  Wire.write((byte) 0x09);                   // GPIO
-  Wire.write((byte) 0x00);                   
-  Wire.endTransmission();
+    Wire.beginTransmission(i2c_addr);
+    Wire.write((byte) 0x09);                   // GPIO
+    Wire.write((byte) 0x00);                   
+    Wire.endTransmission();
   #endif //IO_EXPANDER_MCP23008
 
 }
@@ -1586,14 +1463,14 @@ void i2c_expander_write(byte expander_number,byte value){
 
 
   #ifdef IO_EXPANDER_MCP23008
-  Wire.beginTransmission(i2c_expander_addr[expander_number]); 
-  Wire.write(0x09);
-  Wire.write(value);
-  Wire.endTransmission();
-  i2c_expander_pins[expander_number] = value;
+    Wire.beginTransmission(i2c_expander_addr[expander_number]); 
+    Wire.write(0x09);
+    Wire.write(value);
+    Wire.endTransmission();
+    i2c_expander_pins[expander_number] = value;
   #endif //IO_EXPANDER_MCP23008
   #ifdef I2C_POST_WRITE_DELAY
-  delay(I2C_POST_WRITE_DELAY);
+    delay(I2C_POST_WRITE_DELAY);
   #endif //I2C_POST_WRITE_DELAY
 }
 
@@ -1606,47 +1483,47 @@ void i2c_pin_write(byte pin_number,byte value){
   byte pin_value = 1;
 
   #ifdef IO_EXPANDER_MCP23008
-  byte expander_number = (pin_number - 1) / PINS_PER_IO_EXPANDER;
-  pin_number = pin_number - (expander_number * PINS_PER_IO_EXPANDER);
+    byte expander_number = (pin_number - 1) / PINS_PER_IO_EXPANDER;
+    pin_number = pin_number - (expander_number * PINS_PER_IO_EXPANDER);
 
-  pin_value = pin_value << (pin_number-1);
+    pin_value = pin_value << (pin_number-1);
 
-  if (value) {
-    i2c_expander_pins[expander_number] = i2c_expander_pins[expander_number] | pin_value;
-  } 
-  else {
-    i2c_expander_pins[expander_number] = i2c_expander_pins[expander_number] &  (~pin_value);
-  }
+    if (value) {
+      i2c_expander_pins[expander_number] = i2c_expander_pins[expander_number] | pin_value;
+    } 
+    else {
+      i2c_expander_pins[expander_number] = i2c_expander_pins[expander_number] &  (~pin_value);
+    }
 
-  #ifdef DEBUG_I2C_PIN_WRITE
-  Serial.print("i2c_pin_write: expander: ");
-  Serial.print(expander_number);
-  Serial.print(" i2c_address: ");
-  Serial.print(i2c_expander_addr[expander_number]);
-  Serial.print(" pin_number: ");
-  Serial.print(pin_number);
-  Serial.print(" expander_pins: ");
-  Serial.print(i2c_expander_pins[expander_number]);
-  Serial.print("    pin_value: ");
-  Serial.print(pin_value);
-  Serial.println();
-  unsigned long start_time  = millis();
-  #endif //DEBUG_I2C_PIN_WRITE
+    #ifdef DEBUG_I2C_PIN_WRITE
+      Serial.print("i2c_pin_write: expander: ");
+      Serial.print(expander_number);
+      Serial.print(" i2c_address: ");
+      Serial.print(i2c_expander_addr[expander_number]);
+      Serial.print(" pin_number: ");
+      Serial.print(pin_number);
+      Serial.print(" expander_pins: ");
+      Serial.print(i2c_expander_pins[expander_number]);
+      Serial.print("    pin_value: ");
+      Serial.print(pin_value);
+      Serial.println();
+      unsigned long start_time  = millis();
+    #endif //DEBUG_I2C_PIN_WRITE
 
-  Wire.beginTransmission(i2c_expander_addr[expander_number]); 
-  Wire.write(0x09);
-  Wire.write(i2c_expander_pins[expander_number]);
-  Wire.endTransmission();
-  
-  #ifdef I2C_POST_WRITE_DELAY
-  delay(I2C_POST_WRITE_DELAY);
-  #endif //I2C_POST_WRITE_DELAY
+    Wire.beginTransmission(i2c_expander_addr[expander_number]); 
+    Wire.write(0x09);
+    Wire.write(i2c_expander_pins[expander_number]);
+    Wire.endTransmission();
+    
+    #ifdef I2C_POST_WRITE_DELAY
+      delay(I2C_POST_WRITE_DELAY);
+    #endif //I2C_POST_WRITE_DELAY
 
-  #ifdef DEBUG_I2C_PIN_WRITE
-  Serial.print(F("i2c_pin_write: "));
-  Serial.print(millis()-start_time);
-  Serial.println(F(" mS"));
-  #endif //DEBUG_I2C_PIN_WRITE 
+    #ifdef DEBUG_I2C_PIN_WRITE
+      Serial.print(F("i2c_pin_write: "));
+      Serial.print(millis()-start_time);
+      Serial.println(F(" mS"));
+    #endif //DEBUG_I2C_PIN_WRITE 
 
   #endif //IO_EXPANDER_MCP23008
 }
@@ -1686,16 +1563,27 @@ void wakeup() {
 #ifdef FEATURE_FREQ_COUNTER
 unsigned int current_freq() { 
   #ifndef DEBUG_NO_FREQ 
-  FreqCounter::f_comp=10;
-  FreqCounter::start(FREQ_COUNTER_GATE_TIME);  
-  while (FreqCounter::f_ready == 0) {
-    //last_measured_frequency = (FreqCounter::f_freq * frequency_counter_calibration * 4);
-  }
-  last_measured_frequency = (FreqCounter::f_freq * frequency_counter_calibration * 4);
-  if (last_measured_frequency > 0) {last_known_good_freq = last_measured_frequency;}
-  return last_measured_frequency;
+
+    unsigned long count_start_time = millis();
+
+    #if defined(OPTION_USE_OLD_FREQ_COUNTER_LIBRARY)
+      FreqCounter::f_comp=10;
+      FreqCounter::start(FREQ_COUNTER_GATE_TIME);  
+      while (FreqCounter::f_ready == 0) {}
+      last_measured_frequency = (FreqCounter::f_freq * frequency_counter_calibration * 4);
+    #else
+      while ((FreqCount.available() == 0) && (millis() - count_start_time < 50)){}
+      if (FreqCount.available()){
+        last_measured_frequency = (FreqCount.read() * frequency_counter_calibration  * 4);
+        } else {
+          last_measured_frequency = 0;
+        } 
+    #endif
+
+    if (last_measured_frequency > 0) {last_known_good_freq = last_measured_frequency;}
+    return last_measured_frequency;
   #else
-  return 0;
+    return 0;
   #endif //#ifndef DEBUG_NO_FREQ
 }
 #else
@@ -2337,7 +2225,7 @@ void check_serial(){
         #endif //FEATURE_RECEIVE_FREQ_AUTOSWITCH
         //#ifdef DEBUG_TUNE_BUFFER
         case 'B': print_tune_buffer(); break;
-        case 'C': tune_buffer_clear(); break;        
+        case 'C': tune_buffer_clear(); Serial.println(F("\n\rTune Buffer Cleared")); break;        
         //#endif //DEBUG_TUNE_BUFFER
         case 'D':                                       // D - toggle debug mode
           Serial.print(F("\n\rDebug O"));
@@ -2368,8 +2256,8 @@ void check_serial(){
           }
           break;      
         #ifdef FEATURE_RIG_INTERFACE
-        case 'T': rig_tune(1); break;
-        case 'R': rig_tune(0); break;
+          case 'T': rig_tune(1); break;
+          case 'R': rig_tune(0); break;
         #endif //FEATURE_RIG_INTERFACE
         case 'S': print_status(); break;                // S - print status
         case 'U':                                       // U - tune unlock
@@ -2377,23 +2265,23 @@ void check_serial(){
           Serial.println(F("\n\rTune Unlock"));
           break;
         #ifdef DEBUG_EEPROM    
-        case 'V': read_tune_buffer_from_eeprom(); break;
-        case 'Y': write_tune_buffer_to_eeprom(); break;    
-        case 'O': clear_out_eeprom(); break;
-        case 'E': print_eeprom(); break;
+          case 'V': read_tune_buffer_from_eeprom(); break;
+          case 'Y': write_tune_buffer_to_eeprom(); break;    
+          case 'O': clear_out_eeprom(); break;
+          case 'E': print_eeprom(); break;
         #endif //DEBUG_EEPROM
         #ifdef FEATURE_SLEEP_MODE
-        case 'Z':                                       // Z - toggle sleep mode
-          Serial.print(F("Sleep "));
-          if (sleep_disabled) {
-            Serial.print(F("En"));
-            sleep_disabled = 0;
-          } else {
-            Serial.print(F("Dis"));
-            sleep_disabled = 1;
-          }
-          Serial.println(F("abled"));
-          break;
+          case 'Z':                                       // Z - toggle sleep mode
+            Serial.print(F("Sleep "));
+            if (sleep_disabled) {
+              Serial.print(F("En"));
+              sleep_disabled = 0;
+            } else {
+              Serial.print(F("Dis"));
+              sleep_disabled = 1;
+            }
+            Serial.println(F("abled"));
+            break;
         #endif //FEATURE_SLEEP_MODE     
         default: 
           Serial.println(F("\n\rError"));
@@ -3081,7 +2969,7 @@ void update_static_screen_tune_info(){
 #ifdef FEATURE_DISPLAY
 void update_static_screen_swr(){
   
-  char workstring[5] = "";
+  char workstring[8] = "";
  
   lcd.setCursor(0,0);            
   dtostrf(current_swr,4,2,workstring);
